@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TonicNote, SwarDefinition, Saptak,SCALE_OPTIONS } from '@/types/music';
+import { TonicNote, SwarDefinition, Saptak, SCALE_OPTIONS } from '@/types/music';
 import { ALL_SWARAS } from '@/lib/audio/tuning';
 import { getSoundEngine, SoundEngine } from '@/lib/audio/SoundEngine';
 
@@ -12,9 +12,13 @@ export default function Home() {
   const [rootTonic, setRootTonic] = useState<TonicNote>('C#');
   const [isDroneActive, setIsDroneActive] = useState(false);
 
+  // Volume state
+  const [droneVolume, setDroneVolume] = useState<number>(0.7);
+  const [harmoniumVolume, setHarmoniumVolume] = useState<number>(0.85);
+
   // Mode & Phrase Settings
   const [mode, setMode] = useState<PracticeMode>('phrase');
-  const [phraseLength, setPhraseLength] = useState<number>(2); // 2, 3, or 4 notes
+  const [phraseLength, setPhraseLength] = useState<number>(2);
 
   // Octave & note filter toggles
   const [activeSaptaks, setActiveSaptaks] = useState<Record<Saptak, boolean>>({
@@ -68,14 +72,22 @@ export default function Home() {
     }
   };
 
-  // Live transpose when the scale dropdown changes
+  const handleDroneVolumeChange = (vol: number) => {
+    setDroneVolume(vol);
+    engine?.setDroneVolume(vol);
+  };
+
+  const handleHarmoniumVolumeChange = (vol: number) => {
+    setHarmoniumVolume(vol);
+    engine?.setHarmoniumVolume(vol);
+  };
+
   useEffect(() => {
     if (isDroneActive && engine) {
       engine.startRootDrone(rootTonic);
     }
   }, [rootTonic, isDroneActive, engine]);
 
-  // Start a new test without playing the reference Sa first
   const startNewChallenge = () => {
     if (!engine || availableSwaras.length === 0) return;
     setFeedback(null);
@@ -85,11 +97,8 @@ export default function Home() {
       const chosen = availableSwaras[Math.floor(Math.random() * availableSwaras.length)];
       setTargetSwar(chosen);
       setTargetPhrase([]);
-
-      // Play ONLY the mystery swar directly
       engine.playHarmoniumNote(rootTonic, chosen.semitoneOffset, 1.2);
     } else {
-      // Combination mode: Pick N sequential notes
       const phrase: SwarDefinition[] = [];
       for (let i = 0; i < phraseLength; i++) {
         const randNote = availableSwaras[Math.floor(Math.random() * availableSwaras.length)];
@@ -97,8 +106,6 @@ export default function Home() {
       }
       setTargetPhrase(phrase);
       setTargetSwar(null);
-
-      // Play the mystery phrase directly
       engine.playSwarSequence(
         rootTonic,
         phrase.map((s) => s.semitoneOffset),
@@ -108,7 +115,6 @@ export default function Home() {
     }
   };
 
-  // Replay current mystery note or phrase
   const replayAudio = () => {
     if (!engine) return;
     if (mode === 'single' && targetSwar) {
@@ -123,7 +129,6 @@ export default function Home() {
     }
   };
 
-  // Handle single note guess
   const handleSingleGuess = (swar: SwarDefinition) => {
     if (!targetSwar) return;
     const isMatch = swar.id === targetSwar.id;
@@ -148,18 +153,15 @@ export default function Home() {
     }, 1400);
   };
 
-  // Handle combination / phrase guess
   const handlePhraseGuess = (swar: SwarDefinition) => {
     if (targetPhrase.length === 0) return;
     if (userPhraseGuess.length >= phraseLength) return;
 
-    // Play note on tap so ear confirms touch
     engine?.playHarmoniumNote(rootTonic, swar.semitoneOffset, 0.5);
 
     const nextGuess = [...userPhraseGuess, swar];
     setUserPhraseGuess(nextGuess);
 
-    // If completed the slots, evaluate!
     if (nextGuess.length === phraseLength) {
       const isAllCorrect = nextGuess.every(
         (guess, idx) => guess.id === targetPhrase[idx].id
@@ -214,16 +216,17 @@ export default function Home() {
       </header>
 
       <div className="w-full max-w-4xl space-y-5">
-        {/* Drone & Root Sa Controller */}
+        {/* Drone, Root Sa & Tanpura Volume Controller */}
         <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-4">
-          <div>
+          <div className="flex items-center gap-6 flex-wrap">
+            <div>
               <label className="text-xs text-neutral-400 uppercase tracking-wider block mb-1">
                 Scale (Root Sa / सुर)
               </label>
               <select
                 value={rootTonic}
                 onChange={(e) => setRootTonic(e.target.value as TonicNote)}
-                className="bg-neutral-800 border border-neutral-700 text-amber-300 font-semibold rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+                className="bg-neutral-800 border border-neutral-700 text-amber-300 font-semibold rounded px-3 py-1.5 focus:outline-none cursor-pointer"
               >
                 {SCALE_OPTIONS.map(({ note, label }) => (
                   <option key={note} value={note} className="bg-neutral-900 text-neutral-100">
@@ -233,9 +236,25 @@ export default function Home() {
               </select>
             </div>
 
+            <div>
+              <label className="text-xs text-neutral-400 uppercase tracking-wider block mb-1">
+                Tanpura Vol: <span className="text-amber-400">{Math.round(droneVolume * 100)}%</span>
+              </label>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={droneVolume}
+                onChange={(e) => handleDroneVolumeChange(parseFloat(e.target.value))}
+                className="w-28 accent-amber-500 cursor-pointer"
+              />
+            </div>
+          </div>
+
           <button
             onClick={toggleDrone}
-            className={`px-5 py-2.5 rounded-lg font-medium transition-all ${
+            className={`px-5 py-2.5 rounded-lg font-medium transition-all cursor-pointer ${
               isDroneActive
                 ? 'bg-rose-600 hover:bg-rose-700 text-white'
                 : 'bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold'
@@ -251,7 +270,7 @@ export default function Home() {
             <span className="text-xs text-neutral-400 uppercase tracking-wider">Mode:</span>
             <button
               onClick={() => { setMode('single'); setTargetPhrase([]); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 mode === 'single'
                   ? 'bg-amber-500 text-neutral-950 font-bold'
                   : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
@@ -261,7 +280,7 @@ export default function Home() {
             </button>
             <button
               onClick={() => { setMode('phrase'); setTargetSwar(null); }}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
                 mode === 'phrase'
                   ? 'bg-amber-500 text-neutral-950 font-bold'
                   : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
@@ -282,7 +301,7 @@ export default function Home() {
                     setUserPhraseGuess([]);
                     setTargetPhrase([]);
                   }}
-                  className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition cursor-pointer ${
                     phraseLength === len
                       ? 'bg-amber-400 text-neutral-950'
                       : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
@@ -303,7 +322,7 @@ export default function Home() {
               <button
                 key={saptak}
                 onClick={() => toggleSaptak(saptak)}
-                className={`px-3 py-1 rounded text-xs font-semibold capitalize transition ${
+                className={`px-3 py-1 rounded text-xs font-semibold capitalize transition cursor-pointer ${
                   activeSaptaks[saptak]
                     ? 'bg-amber-500 text-neutral-950 shadow'
                     : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
@@ -319,7 +338,7 @@ export default function Home() {
               type="checkbox"
               checked={onlyShuddha}
               onChange={(e) => setOnlyShuddha(e.target.checked)}
-              className="rounded accent-amber-500"
+              className="rounded accent-amber-500 cursor-pointer"
             />
             <span className="text-neutral-300 text-xs">Shuddha Swaras Only (Bilawal)</span>
           </label>
@@ -345,28 +364,45 @@ export default function Home() {
               </p>
               <button
                 onClick={startNewChallenge}
-                className="bg-amber-500 hover:bg-amber-400 text-neutral-950 px-6 py-3 rounded-lg font-bold shadow-md transition"
+                className="bg-amber-500 hover:bg-amber-400 text-neutral-950 px-6 py-3 rounded-lg font-bold shadow-md transition cursor-pointer"
               >
                 {mode === 'single' ? 'Begin Single Note Ear Training' : `Begin ${phraseLength}-Note Combination`}
               </button>
             </div>
           ) : (
             <>
-              {/* Controls & Sequence Slots */}
+              {/* Controls, Notes Volume & Sequence Slots */}
               <div className="flex flex-col items-center gap-4">
-                <div className="flex justify-center gap-3">
+                <div className="flex flex-wrap items-center justify-center gap-3">
                   <button
                     onClick={() => engine?.playHarmoniumNote(rootTonic, 0, 1.0)}
-                    className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 px-4 py-2 rounded text-sm font-medium transition"
+                    className="bg-neutral-800 hover:bg-neutral-700 active:bg-neutral-600 border border-neutral-700 text-neutral-200 px-4 py-2 rounded text-sm font-medium transition cursor-pointer"
                   >
-                    Play Madhya Sa
+                    Play Madhya Sa (सा)
                   </button>
                   <button
                     onClick={replayAudio}
-                    className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 px-4 py-2 rounded text-sm font-medium transition"
+                    className="bg-amber-500/20 hover:bg-amber-500/30 active:bg-amber-500/40 border border-amber-500/40 text-amber-300 px-4 py-2 rounded text-sm font-medium transition cursor-pointer"
                   >
                     Replay Combination 🔁
                   </button>
+
+                  {/* Notes / Harmonium Volume Slider */}
+                  <div className="flex items-center gap-2 bg-neutral-950/60 px-3 py-1.5 rounded-lg border border-neutral-800">
+                    <span className="text-xs text-neutral-400">Notes Vol:</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.05"
+                      value={harmoniumVolume}
+                      onChange={(e) => handleHarmoniumVolumeChange(parseFloat(e.target.value))}
+                      className="w-20 accent-amber-500 cursor-pointer"
+                    />
+                    <span className="text-xs text-neutral-300 w-7 text-right">
+                      {Math.round(harmoniumVolume * 100)}%
+                    </span>
+                  </div>
                 </div>
 
                 {/* Slots display for phrase mode */}
@@ -394,7 +430,7 @@ export default function Home() {
                     {userPhraseGuess.length > 0 && userPhraseGuess.length < phraseLength && (
                       <button
                         onClick={() => setUserPhraseGuess((prev) => prev.slice(0, -1))}
-                        className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-2.5 py-1.5 rounded border border-neutral-700 ml-2"
+                        className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-2.5 py-1.5 rounded border border-neutral-700 ml-2 cursor-pointer"
                       >
                         Undo ⌫
                       </button>
@@ -412,7 +448,7 @@ export default function Home() {
                 )}
               </div>
 
-              {/* 3-Saptak Swar Grid with clean dots */}
+              {/* 3-Saptak Swar Grid with Bhatkhande notation */}
               <div className="space-y-4 pt-2">
                 {saptakOrder
                   .filter((saptak) => activeSaptaks[saptak])
@@ -428,7 +464,7 @@ export default function Home() {
                             <button
                               key={swar.id}
                               onClick={() => handleSwarClick(swar)}
-                              className={`flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all ${
+                              className={`flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all cursor-pointer ${
                                 swar.isKomalOrTeevra
                                   ? 'bg-neutral-900 border-neutral-700/80 hover:bg-neutral-800 text-neutral-300'
                                   : 'bg-neutral-800 border-neutral-600/80 hover:bg-neutral-700 text-white font-medium'

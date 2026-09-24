@@ -2,30 +2,34 @@
 import { TonicNote } from '@/types/music';
 import { getSwarFrequency } from './tuning';
 
-// Explicit mapping from every tonic note to its dedicated studio loop
 const TANPURA_AUDIO_MAP: Record<TonicNote, string> = {
-  'A':      '/audio/tanpura_A.mp3',
-  'A#':     '/audio/tanpura_Asharp.mp3',
-  'B':      '/audio/tanpura_B.mp3',
-  'C':      '/audio/tanpura_C.mp3',
+  'A':      '/audio/tanpura_a.mp3',
+  'A#':     '/audio/tanpura_asharp.mp3',
+  'B':      '/audio/tanpura_b.mp3',
+  'C':      '/audio/tanpura_c.mp3',
   'C#':     '/audio/tanpura_Csharp.mp3',
-  'D':      '/audio/tanpura_D.mp3',
-  'D#':     '/audio/tanpura_Dsharp.mp3',
-  'E':      '/audio/tanpura_E.mp3',
-  'F':      '/audio/tanpura_F.mp3',
-  'F#':     '/audio/tanpura_Fsharp.mp3',
-  'G':      '/audio/tanpura_G.mp3',
-  'G#':     '/audio/tanpura_Gsharp.mp3',
+  'D':      '/audio/tanpura_d.mp3',
+  'D#':     '/audio/tanpura_dsharp.mp3',
+  'E':      '/audio/tanpura_e.mp3',
+  'F':      '/audio/tanpura_f.mp3',
+  'F#':     '/audio/tanpura_fsharp.mp3',
+  'G':      '/audio/tanpura_g.mp3',
+  'G#':     '/audio/tanpura_gsharp.mp3',
 };
 
 export class SoundEngine {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private harmoniumGain: GainNode | null = null;
 
   // Real Audio Streaming
   private audioElement: HTMLAudioElement | null = null;
   private isDronePlaying = false;
   private currentTonic: TonicNote | null = null;
+
+  // Volume levels (0.0 to 1.0)
+  private droneVolume: number = 0.7;
+  private harmoniumVolume: number = 0.85;
 
   private initContext(): AudioContext {
     if (!this.ctx) {
@@ -33,9 +37,14 @@ export class SoundEngine {
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       this.ctx = new AudioCtx();
+      
       this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(1.0, this.ctx.currentTime);
       this.masterGain.connect(this.ctx.destination);
+
+      this.harmoniumGain = this.ctx.createGain();
+      this.harmoniumGain.gain.setValueAtTime(this.harmoniumVolume, this.ctx.currentTime);
+      this.harmoniumGain.connect(this.masterGain);
     }
     if (this.ctx.state === 'suspended') {
       this.ctx.resume();
@@ -43,34 +52,41 @@ export class SoundEngine {
     return this.ctx;
   }
 
-  /**
-   * Starts or seamlessly updates the authentic Tanpura drone
-   * using a dedicated recording for the chosen tonic note.
-   */
+  public setDroneVolume(volume: number): void {
+    this.droneVolume = Math.max(0, Math.min(1, volume));
+    if (this.audioElement) {
+      this.audioElement.volume = this.droneVolume;
+    }
+  }
+
+  public setHarmoniumVolume(volume: number): void {
+    this.harmoniumVolume = Math.max(0, Math.min(1, volume));
+    if (this.harmoniumGain && this.ctx) {
+      this.harmoniumGain.gain.setValueAtTime(this.harmoniumVolume, this.ctx.currentTime);
+    }
+  }
+
   public startRootDrone(root: TonicNote): void {
     this.initContext();
 
-    const targetSrc = TANPURA_AUDIO_MAP[root];
+    const targetSrc = TANPURA_AUDIO_MAP[root] || '/audio/tanpura_Csharp.mp3';
 
-    // If already playing the requested key, don't restart it
     if (this.isDronePlaying && this.currentTonic === root && this.audioElement) {
       return;
     }
 
-    // Stop current track if switching keys
     if (this.audioElement) {
       this.audioElement.pause();
     }
 
-    // Instantiate or re-source the audio element
     if (!this.audioElement) {
       this.audioElement = new Audio();
       this.audioElement.loop = true;
-      this.audioElement.volume = 0.75;
     }
 
     this.audioElement.src = targetSrc;
-    this.audioElement.playbackRate = 1.0; // Pure acoustic speed, no pitch shifting
+    this.audioElement.volume = this.droneVolume;
+    this.audioElement.playbackRate = 1.0;
     this.currentTonic = root;
 
     this.audioElement.play().catch((err) => {
@@ -93,11 +109,12 @@ export class SoundEngine {
     return this.isDronePlaying;
   }
 
-  /**
-   * Harmonium Swar Player (Synthesizer)
-   */
-  public playHarmoniumNote(root: TonicNote, offset: number, durationSec: number = 1.2): void {
+  public async playHarmoniumNote(root: TonicNote, offset: number, durationSec: number = 1.2): Promise<void> {
     const ctx = this.initContext();
+    if (ctx.state === 'suspended') {
+      await ctx.resume();
+    }
+
     const freq = getSwarFrequency(root, offset);
     const now = ctx.currentTime;
 
@@ -127,7 +144,7 @@ export class SoundEngine {
     osc1.connect(filter);
     osc2.connect(filter);
     filter.connect(noteGain);
-    noteGain.connect(this.masterGain!);
+    noteGain.connect(this.harmoniumGain!);
 
     osc1.start(now);
     osc2.start(now);
@@ -135,9 +152,6 @@ export class SoundEngine {
     osc2.stop(now + durationSec);
   }
 
-  /**
-   * Phrase / Combination Player
-   */
   public playSwarSequence(
     root: TonicNote,
     offsets: number[],
