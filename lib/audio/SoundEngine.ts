@@ -3,18 +3,18 @@ import { TonicNote } from '@/types/music';
 import { getSwarFrequency } from './tuning';
 
 const TANPURA_AUDIO_MAP: Record<TonicNote, string> = {
-  'A':      '/audio/tanpura_a.mp3',
-  'A#':     '/audio/tanpura_asharp.mp3',
-  'B':      '/audio/tanpura_b.mp3',
-  'C':      '/audio/tanpura_c.mp3',
+  'A':      '/audio/tanpura_A.mp3',
+  'A#':     '/audio/tanpura_Asharp.mp3',
+  'B':      '/audio/tanpura_B.mp3',
+  'C':      '/audio/tanpura_C.mp3',
   'C#':     '/audio/tanpura_Csharp.mp3',
-  'D':      '/audio/tanpura_d.mp3',
-  'D#':     '/audio/tanpura_dsharp.mp3',
-  'E':      '/audio/tanpura_e.mp3',
-  'F':      '/audio/tanpura_f.mp3',
-  'F#':     '/audio/tanpura_fsharp.mp3',
-  'G':      '/audio/tanpura_g.mp3',
-  'G#':     '/audio/tanpura_gsharp.mp3',
+  'D':      '/audio/tanpura_D.mp3',
+  'D#':     '/audio/tanpura_Dsharp.mp3',
+  'E':      '/audio/tanpura_E.mp3',
+  'F':      '/audio/tanpura_F.mp3',
+  'F#':     '/audio/tanpura_Fsharp.mp3',
+  'G':      '/audio/tanpura_G.mp3',
+  'G#':     '/audio/tanpura_Gsharp.mp3',
 };
 
 export class SoundEngine {
