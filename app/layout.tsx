@@ -18,6 +18,10 @@ export const metadata: Metadata = {
   verification: {
     google: 'g980YmtfP-7dgmG8ef233J_07IUo-U3U0YqkKqKee0Y', // <-- Paste your exact code here
   },
+  icons: {
+    icon: '/swar_pehchaan_logo.jpeg',
+    apple: '/swar_pehchaan_logo.jpeg',
+  },
   description:
     'Free online Indian classical music ear training tool. Practice swar pehchaan, swar sangati, and pitch identification with an authentic Tanpura drone and Bhatkhande notation.',
   keywords: [
