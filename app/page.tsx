@@ -212,27 +212,26 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center p-4 md:p-8">
-      <header className="w-full max-w-4xl py-4 border-b border-neutral-800 mb-6 flex items-center justify-center gap-3.5">
-        {/* If using the component: */}
-        
+      <header className="w-full max-w-4xl py-4 border-b border-neutral-800 mb-6 flex flex-col items-center justify-center text-center">
+        {/* Full-width horizontal banner */}
+        <div className="relative w-full h-32 sm:h-44 rounded-2xl overflow-hidden shadow-lg mb-4">
+          <Image
+            src="/swar_pehchaan_logo.jpeg"
+            alt="Swar Pehchaan Logo"
+            fill
+            priority
+            className="object-contain"
+            sizes="(max-width: 896px) 100vw, 896px"
+          />
+        </div>
 
-        {/* OR if using an image file from public/logo.png: */}
-        {
-        <Image
-          src="/swar_pehchaan_logo.jpeg"
-          alt="Swar Pehchaan Logo"
-          width={300}
-          height={100}
-          className="rounded-xl border border-amber-500/30"
-          loading='eager'
-        /> 
-        }
-
-        <div className="text-left">
+        <div>
           <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-amber-400 leading-tight">
             स्वर पहचान <span className="text-neutral-200 text-lg sm:text-xl font-normal">(Swar Pehchaan)</span>
           </h1>
-          <p className="text-neutral-400 text-xs sm:text-sm">Hindustani Classical Ear Training & Riyaz</p>
+          <p className="text-neutral-400 text-xs sm:text-sm mt-1">
+            Hindustani Classical Ear Training & Riyaz
+          </p>
         </div>
       </header>
 
