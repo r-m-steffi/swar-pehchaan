@@ -1,69 +1,473 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { TonicNote, SwarDefinition, Saptak,SCALE_OPTIONS } from '@/types/music';
+import { ALL_SWARAS } from '@/lib/audio/tuning';
+import { getSoundEngine, SoundEngine } from '@/lib/audio/SoundEngine';
+
+type PracticeMode = 'single' | 'phrase';
 
 export default function Home() {
+  const [engine, setEngine] = useState<SoundEngine | null>(null);
+  const [rootTonic, setRootTonic] = useState<TonicNote>('C#');
+  const [isDroneActive, setIsDroneActive] = useState(false);
+
+  // Mode & Phrase Settings
+  const [mode, setMode] = useState<PracticeMode>('phrase');
+  const [phraseLength, setPhraseLength] = useState<number>(2); // 2, 3, or 4 notes
+
+  // Octave & note filter toggles
+  const [activeSaptaks, setActiveSaptaks] = useState<Record<Saptak, boolean>>({
+    mandra: false,
+    madhya: true,
+    taar: false,
+  });
+  const [onlyShuddha, setOnlyShuddha] = useState(true);
+
+  // Quiz states
+  const [targetSwar, setTargetSwar] = useState<SwarDefinition | null>(null);
+  const [targetPhrase, setTargetPhrase] = useState<SwarDefinition[]>([]);
+  const [userPhraseGuess, setUserPhraseGuess] = useState<SwarDefinition[]>([]);
+
+  const [score, setScore] = useState({ correct: 0, total: 0 });
+  const [streak, setStreak] = useState(0);
+  const [feedback, setFeedback] = useState<{ message: string; isCorrect: boolean } | null>(null);
+
+  useEffect(() => {
+    const sound = getSoundEngine();
+    setEngine(sound);
+    return () => {
+      sound.stopRootDrone();
+    };
+  }, []);
+
+  const availableSwaras = ALL_SWARAS.filter((s) => {
+    if (!activeSaptaks[s.saptak]) return false;
+    if (onlyShuddha && s.isKomalOrTeevra) return false;
+    return true;
+  });
+
+  const toggleSaptak = (saptak: Saptak) => {
+    const activeCount = Object.values(activeSaptaks).filter(Boolean).length;
+    if (activeSaptaks[saptak] && activeCount === 1) return;
+
+    setActiveSaptaks((prev) => ({
+      ...prev,
+      [saptak]: !prev[saptak],
+    }));
+  };
+
+  const toggleDrone = () => {
+    if (!engine) return;
+    if (isDroneActive) {
+      engine.stopRootDrone();
+      setIsDroneActive(false);
+    } else {
+      engine.startRootDrone(rootTonic);
+      setIsDroneActive(true);
+    }
+  };
+
+  // Live transpose when the scale dropdown changes
+  useEffect(() => {
+    if (isDroneActive && engine) {
+      engine.startRootDrone(rootTonic);
+    }
+  }, [rootTonic, isDroneActive, engine]);
+
+  // Start a new test without playing the reference Sa first
+  const startNewChallenge = () => {
+    if (!engine || availableSwaras.length === 0) return;
+    setFeedback(null);
+    setUserPhraseGuess([]);
+
+    if (mode === 'single') {
+      const chosen = availableSwaras[Math.floor(Math.random() * availableSwaras.length)];
+      setTargetSwar(chosen);
+      setTargetPhrase([]);
+
+      // Play ONLY the mystery swar directly
+      engine.playHarmoniumNote(rootTonic, chosen.semitoneOffset, 1.2);
+    } else {
+      // Combination mode: Pick N sequential notes
+      const phrase: SwarDefinition[] = [];
+      for (let i = 0; i < phraseLength; i++) {
+        const randNote = availableSwaras[Math.floor(Math.random() * availableSwaras.length)];
+        phrase.push(randNote);
+      }
+      setTargetPhrase(phrase);
+      setTargetSwar(null);
+
+      // Play the mystery phrase directly
+      engine.playSwarSequence(
+        rootTonic,
+        phrase.map((s) => s.semitoneOffset),
+        0.7,
+        0.25
+      );
+    }
+  };
+
+  // Replay current mystery note or phrase
+  const replayAudio = () => {
+    if (!engine) return;
+    if (mode === 'single' && targetSwar) {
+      engine.playHarmoniumNote(rootTonic, targetSwar.semitoneOffset, 1.2);
+    } else if (mode === 'phrase' && targetPhrase.length > 0) {
+      engine.playSwarSequence(
+        rootTonic,
+        targetPhrase.map((s) => s.semitoneOffset),
+        0.7,
+        0.25
+      );
+    }
+  };
+
+  // Handle single note guess
+  const handleSingleGuess = (swar: SwarDefinition) => {
+    if (!targetSwar) return;
+    const isMatch = swar.id === targetSwar.id;
+    if (isMatch) {
+      setScore((prev) => ({ correct: prev.correct + 1, total: prev.total + 1 }));
+      setStreak((prev) => prev + 1);
+      setFeedback({
+        message: `Correct! ${targetSwar.devanagari} (${targetSwar.fullName})`,
+        isCorrect: true,
+      });
+    } else {
+      setScore((prev) => ({ ...prev, total: prev.total + 1 }));
+      setStreak(0);
+      setFeedback({
+        message: `Incorrect. It was ${targetSwar.devanagari} (${targetSwar.fullName})`,
+        isCorrect: false,
+      });
+    }
+
+    setTimeout(() => {
+      startNewChallenge();
+    }, 1400);
+  };
+
+  // Handle combination / phrase guess
+  const handlePhraseGuess = (swar: SwarDefinition) => {
+    if (targetPhrase.length === 0) return;
+    if (userPhraseGuess.length >= phraseLength) return;
+
+    // Play note on tap so ear confirms touch
+    engine?.playHarmoniumNote(rootTonic, swar.semitoneOffset, 0.5);
+
+    const nextGuess = [...userPhraseGuess, swar];
+    setUserPhraseGuess(nextGuess);
+
+    // If completed the slots, evaluate!
+    if (nextGuess.length === phraseLength) {
+      const isAllCorrect = nextGuess.every(
+        (guess, idx) => guess.id === targetPhrase[idx].id
+      );
+
+      const targetText = targetPhrase.map((s) => s.devanagari).join(' - ');
+
+      if (isAllCorrect) {
+        setScore((prev) => ({ correct: prev.correct + 1, total: prev.total + 1 }));
+        setStreak((prev) => prev + 1);
+        setFeedback({
+          message: `Shabash! Correct sequence: ${targetText}`,
+          isCorrect: true,
+        });
+      } else {
+        setScore((prev) => ({ ...prev, total: prev.total + 1 }));
+        setStreak(0);
+        setFeedback({
+          message: `Incorrect. Correct sequence was: ${targetText}`,
+          isCorrect: false,
+        });
+      }
+
+      setTimeout(() => {
+        startNewChallenge();
+      }, 2000);
+    }
+  };
+
+  const handleSwarClick = (swar: SwarDefinition) => {
+    if (mode === 'single') {
+      handleSingleGuess(swar);
+    } else {
+      handlePhraseGuess(swar);
+    }
+  };
+
+  const saptakOrder: Saptak[] = ['mandra', 'madhya', 'taar'];
+  const saptakLabels: Record<Saptak, string> = {
+    mandra: 'Mandra Saptak (मंद्र सप्तक)',
+    madhya: 'Madhya Saptak (मध्य सप्तक)',
+    taar: 'Taar Saptak (तार सप्तक)',
+  };
+
+  const isChallengeActive = mode === 'single' ? !!targetSwar : targetPhrase.length > 0;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center p-4 md:p-8">
+      <header className="w-full max-w-4xl text-center py-4 border-b border-neutral-800 mb-6">
+        <h1 className="text-3xl font-bold tracking-wide text-amber-400">स्वर पहचान (Swar Pehchaan)</h1>
+        <p className="text-neutral-400 text-sm mt-1">Swar Sangati & Phrase Ear Training</p>
+      </header>
+
+      <div className="w-full max-w-4xl space-y-5">
+        {/* Drone & Root Sa Controller */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 shadow-lg flex flex-wrap items-center justify-between gap-4">
+          <div>
+              <label className="text-xs text-neutral-400 uppercase tracking-wider block mb-1">
+                Scale (Root Sa / सुर)
+              </label>
+              <select
+                value={rootTonic}
+                onChange={(e) => setRootTonic(e.target.value as TonicNote)}
+                className="bg-neutral-800 border border-neutral-700 text-amber-300 font-semibold rounded px-3 py-1.5 focus:outline-none focus:ring-1 focus:ring-amber-400 cursor-pointer"
+              >
+                {SCALE_OPTIONS.map(({ note, label }) => (
+                  <option key={note} value={note} className="bg-neutral-900 text-neutral-100">
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+          <button
+            onClick={toggleDrone}
+            className={`px-5 py-2.5 rounded-lg font-medium transition-all ${
+              isDroneActive
+                ? 'bg-rose-600 hover:bg-rose-700 text-white'
+                : 'bg-amber-500 hover:bg-amber-600 text-neutral-950 font-bold'
+            }`}
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+            {isDroneActive ? 'Stop Root Sur' : 'Start Root Sur (सा)'}
+          </button>
+        </section>
+
+        {/* Practice Mode & Phrase Length Selector */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-neutral-400 uppercase tracking-wider">Mode:</span>
+            <button
+              onClick={() => { setMode('single'); setTargetPhrase([]); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mode === 'single'
+                  ? 'bg-amber-500 text-neutral-950 font-bold'
+                  : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+              }`}
+            >
+              Single Note
+            </button>
+            <button
+              onClick={() => { setMode('phrase'); setTargetSwar(null); }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mode === 'phrase'
+                  ? 'bg-amber-500 text-neutral-950 font-bold'
+                  : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+              }`}
+            >
+              Phrase / Combination
+            </button>
+          </div>
+
+          {mode === 'phrase' && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-neutral-400 uppercase tracking-wider">Notes in Phrase:</span>
+              {[2, 3, 4].map((len) => (
+                <button
+                  key={len}
+                  onClick={() => {
+                    setPhraseLength(len);
+                    setUserPhraseGuess([]);
+                    setTargetPhrase([]);
+                  }}
+                  className={`w-8 h-8 rounded-lg text-xs font-bold transition ${
+                    phraseLength === len
+                      ? 'bg-amber-400 text-neutral-950'
+                      : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                  }`}
+                >
+                  {len}
+                </button>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Filters */}
+        <section className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-4 flex flex-wrap items-center justify-between gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-neutral-400 text-xs uppercase tracking-wider mr-1">Active Saptaks:</span>
+            {(['mandra', 'madhya', 'taar'] as Saptak[]).map((saptak) => (
+              <button
+                key={saptak}
+                onClick={() => toggleSaptak(saptak)}
+                className={`px-3 py-1 rounded text-xs font-semibold capitalize transition ${
+                  activeSaptaks[saptak]
+                    ? 'bg-amber-500 text-neutral-950 shadow'
+                    : 'bg-neutral-800 text-neutral-400 hover:bg-neutral-700'
+                }`}
+              >
+                {saptak}
+              </button>
+            ))}
+          </div>
+
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={onlyShuddha}
+              onChange={(e) => setOnlyShuddha(e.target.checked)}
+              className="rounded accent-amber-500"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <span className="text-neutral-300 text-xs">Shuddha Swaras Only (Bilawal)</span>
+          </label>
+        </section>
+
+        {/* Stats */}
+        <div className="flex justify-between items-center bg-neutral-900/60 px-4 py-2 rounded-lg border border-neutral-800 text-sm">
+          <div className="flex gap-4">
+            <span>Score: <strong className="text-amber-400">{score.correct}/{score.total}</strong></span>
+            <span>Streak: <strong className="text-emerald-400">{streak} 🔥</strong></span>
+          </div>
+          <span className="text-xs text-neutral-400">{availableSwaras.length} notes in active pool</span>
         </div>
-      </main>
-    </div>
+
+        {/* Interactive Quiz Console */}
+        <section className="bg-neutral-900 border border-neutral-800 rounded-xl p-6 text-center space-y-6">
+          {!isChallengeActive ? (
+            <div className="py-6">
+              <p className="text-neutral-400 mb-4">
+                {mode === 'single'
+                  ? 'Identify the single mystery swar relative to Sa.'
+                  : `Listen to a combination of ${phraseLength} swaras and identify the sequence.`}
+              </p>
+              <button
+                onClick={startNewChallenge}
+                className="bg-amber-500 hover:bg-amber-400 text-neutral-950 px-6 py-3 rounded-lg font-bold shadow-md transition"
+              >
+                {mode === 'single' ? 'Begin Single Note Ear Training' : `Begin ${phraseLength}-Note Combination`}
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Controls & Sequence Slots */}
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex justify-center gap-3">
+                  <button
+                    onClick={() => engine?.playHarmoniumNote(rootTonic, 0, 1.0)}
+                    className="bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 text-neutral-200 px-4 py-2 rounded text-sm font-medium transition"
+                  >
+                    Play Madhya Sa
+                  </button>
+                  <button
+                    onClick={replayAudio}
+                    className="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 px-4 py-2 rounded text-sm font-medium transition"
+                  >
+                    Replay Combination 🔁
+                  </button>
+                </div>
+
+                {/* Slots display for phrase mode */}
+                {mode === 'phrase' && (
+                  <div className="flex items-center gap-3 my-2">
+                    {Array.from({ length: phraseLength }).map((_, idx) => {
+                      const guessed = userPhraseGuess[idx];
+                      return (
+                        <div
+                          key={idx}
+                          className={`w-16 h-20 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${
+                            guessed
+                              ? 'border-amber-400 bg-neutral-800 shadow-md'
+                              : 'border-neutral-700 border-dashed bg-neutral-950/40 text-neutral-500'
+                          }`}
+                        >
+                          <span className="text-[10px] uppercase tracking-wider text-neutral-400">Note {idx + 1}</span>
+                          <span className="text-2xl font-bold mt-1 text-white">
+                            {guessed ? guessed.devanagari : '—'}
+                          </span>
+                        </div>
+                      );
+                    })}
+
+                    {userPhraseGuess.length > 0 && userPhraseGuess.length < phraseLength && (
+                      <button
+                        onClick={() => setUserPhraseGuess((prev) => prev.slice(0, -1))}
+                        className="text-xs bg-neutral-800 hover:bg-neutral-700 text-neutral-300 px-2.5 py-1.5 rounded border border-neutral-700 ml-2"
+                      >
+                        Undo ⌫
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Feedback Banner */}
+              <div className="min-h-6">
+                {feedback && (
+                  <p className={`text-base font-semibold ${feedback.isCorrect ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {feedback.message}
+                  </p>
+                )}
+              </div>
+
+              {/* 3-Saptak Swar Grid with clean dots */}
+              <div className="space-y-4 pt-2">
+                {saptakOrder
+                  .filter((saptak) => activeSaptaks[saptak])
+                  .map((saptak) => {
+                    const notesInSaptak = availableSwaras.filter((s) => s.saptak === saptak);
+                    return (
+                      <div key={saptak} className="text-left bg-neutral-950/60 p-3 rounded-lg border border-neutral-800/80">
+                        <span className="text-xs font-semibold text-neutral-400 block mb-2">
+                          {saptakLabels[saptak]}
+                        </span>
+                        <div className="grid grid-cols-4 sm:grid-cols-7 md:grid-cols-12 gap-2">
+                          {notesInSaptak.map((swar) => (
+                            <button
+                              key={swar.id}
+                              onClick={() => handleSwarClick(swar)}
+                              className={`flex flex-col items-center justify-center p-2.5 rounded-lg border transition-all ${
+                                swar.isKomalOrTeevra
+                                  ? 'bg-neutral-900 border-neutral-700/80 hover:bg-neutral-800 text-neutral-300'
+                                  : 'bg-neutral-800 border-neutral-600/80 hover:bg-neutral-700 text-white font-medium'
+                              } active:bg-amber-500 active:text-neutral-950`}
+                            >
+                              <div className="flex flex-col items-center justify-center min-h-[34px]">
+                                {swar.saptak === 'taar' && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mb-1" />
+                                )}
+
+                                <div className="relative inline-block leading-none">
+                                  <span className="text-xl font-bold">{swar.devanagari}</span>
+
+                                  {swar.isKomalOrTeevra && swar.baseName !== 'Ma' && (
+                                    <span className="absolute -bottom-1 left-0 right-0 h-[2px] bg-neutral-300 rounded" />
+                                  )}
+
+                                  {swar.baseName === 'Ma' && (
+                                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 w-[2px] h-2 bg-neutral-300" />
+                                  )}
+                                </div>
+
+                                {swar.saptak === 'mandra' && (
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5" />
+                                )}
+                              </div>
+
+                              <span className="text-[10px] text-neutral-400 mt-1">{swar.latinNotation}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            </>
+          )}
+        </section>
+      </div>
+    </main>
   );
 }
