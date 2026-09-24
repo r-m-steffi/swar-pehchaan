@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { TonicNote, SwarDefinition, Saptak, SCALE_OPTIONS } from '@/types/music';
 import { ALL_SWARAS } from '@/lib/audio/tuning';
 import { getSoundEngine, SoundEngine } from '@/lib/audio/SoundEngine';
+import Logo from '@/components/logo';
+import Image from 'next/image';
 
 type PracticeMode = 'single' | 'phrase';
 
@@ -210,9 +212,28 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-neutral-100 flex flex-col items-center p-4 md:p-8">
-      <header className="w-full max-w-4xl text-center py-4 border-b border-neutral-800 mb-6">
-        <h1 className="text-3xl font-bold tracking-wide text-amber-400">स्वर पहचान (Swar Pehchaan)</h1>
-        <p className="text-neutral-400 text-sm mt-1">Swar Sangati & Phrase Ear Training</p>
+      <header className="w-full max-w-4xl py-4 border-b border-neutral-800 mb-6 flex items-center justify-center gap-3.5">
+        {/* If using the component: */}
+        
+
+        {/* OR if using an image file from public/logo.png: */}
+        {
+        <Image
+          src="/swar_pehchaan_logo.jpeg"
+          alt="Swar Pehchaan Logo"
+          width={300}
+          height={100}
+          className="rounded-xl border border-amber-500/30"
+          loading='eager'
+        /> 
+        }
+
+        <div className="text-left">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-wide text-amber-400 leading-tight">
+            स्वर पहचान <span className="text-neutral-200 text-lg sm:text-xl font-normal">(Swar Pehchaan)</span>
+          </h1>
+          <p className="text-neutral-400 text-xs sm:text-sm">Hindustani Classical Ear Training & Riyaz</p>
+        </div>
       </header>
 
       <div className="w-full max-w-4xl space-y-5">
