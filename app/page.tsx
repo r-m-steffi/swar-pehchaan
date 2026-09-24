@@ -503,6 +503,30 @@ export default function Home() {
             </>
           )}
         </section>
+                {/* Educational SEO Section */}
+        <section className="w-full max-w-4xl mt-16 pt-8 border-t border-neutral-800 text-neutral-400 text-sm space-y-6">
+          <h2 className="text-xl font-bold text-amber-400">About Swar Pehchaan (स्वर पहचान रियाज़)</h2>
+          
+          <div className="space-y-4 leading-relaxed">
+            <p>
+              <strong>Swar Pehchaan (स्वर पहचान)</strong> is a specialized ear-training web application designed for students and practitioners of Hindustani classical music, semi-classical vocalists, and instrumentalists (Harmonium, Flute, Violin, Sitar).
+            </p>
+
+            <h3 className="text-base font-semibold text-neutral-200">How to Improve Swar Gyan in Riyaz</h3>
+            <p>
+              In Indian classical music, pitch recognition is relative to the tonic drone (<em>Adhara Shadja</em> or <em>Sa</em>). Unlike Western fixed-pitch training, Hindustani ear training requires internalizing the interval relationship of each swar (Komal Re, Shuddha Re, Komal Ga, Shuddha Ga, etc.) against the resonance of the Tanpura.
+            </p>
+
+            <h3 className="text-base font-semibold text-neutral-200">Bhatkhande Notation Reference</h3>
+            <ul className="list-disc list-inside space-y-1">
+              <li><strong>Shuddha Swaras (शुद्ध स्वर):</strong> Sa, Re, Ga, Ma, Pa, Dha, Ni</li>
+              <li><strong>Komal Swaras (कोमल स्वर):</strong> Underline indicator (e.g., <u>रे</u>, <u>ग</u>, <u>ध</u>, <u>नि</u>)</li>
+              <li><strong>Tīvra Swara (तीव्र स्वर):</strong> Vertical stroke above (म॑)</li>
+              <li><strong>Mandra Saptak (मंद्र सप्तक):</strong> Dot below the swar</li>
+              <li><strong>Taar Saptak (तार सप्तक):</strong> Dot above the swar</li>
+            </ul>
+          </div>
+        </section>
       </div>
     </main>
   );
