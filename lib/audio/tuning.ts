@@ -2,18 +2,18 @@ import { TonicNote, SwarDefinition, SwarBaseName, Saptak } from '@/types/music';
 
 // Middle female/male base tonic frequencies (Madhya Sa)
 export const TONIC_FREQUENCIES: Record<TonicNote, number> = {
-  'C': 130.81/2,
-  'C#': 138.59/2, // Kali Ek
-  'D': 146.83/2,
-  'D#': 155.56/2,
-  'E': 164.81/2,
-  'F': 174.61/2,
-  'F#': 185.00/2,
-  'G': 196.00/2,
-  'G#': 207.65/2,
-  'A': 220.00/2,
-  'A#': 233.08/2,
-  'B': 246.94/2,
+  'C': 130.81,
+  'C#': 138.59, // Kali Ek
+  'D': 146.83,
+  'D#': 155.56,
+  'E': 164.81,
+  'F': 174.61,
+  'F#': 185.00,
+  'G': 196.00,
+  'G#': 207.65,
+  'A': 220.00,
+  'A#': 233.08,
+  'B': 246.94,
 };
 
 // Base single-octave template

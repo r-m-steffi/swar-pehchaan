@@ -9,6 +9,39 @@ import Image from 'next/image';
 
 type PracticeMode = 'single' | 'phrase';
 
+function BhatkhandeSwar({ swar, size = 'md' }: { swar: SwarDefinition; size?: 'sm' | 'md' | 'lg' }) {
+  const textSize = size === 'lg' ? 'text-2xl' : size === 'sm' ? 'text-lg' : 'text-xl';
+  const dotSize = size === 'lg' ? 'w-2 h-2' : 'w-1.5 h-1.5';
+  const strokeHeight = size === 'lg' ? 'h-2.5' : 'h-2';
+
+  return (
+    <div className="flex flex-col items-center justify-center leading-none select-none">
+      {/* Taar Saptak dot above */}
+      {swar.saptak === 'taar' && (
+        <span className={`${dotSize} rounded-full bg-amber-400 mb-1`} />
+      )}
+
+      <div className="relative inline-block leading-none">
+        <span className={`${textSize} font-bold`}>{swar.devanagari}</span>
+
+        {/* Komal Swar: Underline for Re, Ga, Dha, Ni */}
+        {swar.isKomalOrTeevra && swar.baseName !== 'Ma' && (
+          <span className="absolute -bottom-1 left-0 right-0 h-[2px] bg-amber-300 rounded" />
+        )}
+
+        {/* Teevra Madhyam: Vertical tick above Ma */}
+        {swar.baseName === 'Ma' && (
+          <span className={`absolute -top-2 left-1/2 -translate-x-1/2 w-[2px] ${strokeHeight} bg-amber-300`} />
+        )}
+      </div>
+
+      {/* Mandra Saptak dot below */}
+      {swar.saptak === 'mandra' && (
+        <span className={`${dotSize} rounded-full bg-amber-400 mt-1`} />
+      )}
+    </div>
+  );
+}
 export default function Home() {
   const [engine, setEngine] = useState<SoundEngine | null>(null);
   const [rootTonic, setRootTonic] = useState<TonicNote>('C#');
@@ -440,9 +473,16 @@ export default function Home() {
                           }`}
                         >
                           <span className="text-[10px] uppercase tracking-wider text-neutral-400">Note {idx + 1}</span>
-                          <span className="text-2xl font-bold mt-1 text-white">
-                            {guessed ? guessed.devanagari : '—'}
-                          </span>
+                          <div className="mt-1">
+                              {guessed ? (
+                                <div className="flex flex-col items-center">
+                                  <BhatkhandeSwar swar={guessed} size="lg" />
+                                  <span className="text-[10px] text-neutral-400 mt-1">{guessed.latinNotation}</span>
+                                </div>
+                              ) : (
+                                <span className="text-2xl font-bold text-neutral-600">—</span>
+                              )}
+                            </div>
                         </div>
                       );
                     })}
@@ -490,28 +530,9 @@ export default function Home() {
                                   : 'bg-neutral-800 border-neutral-600/80 hover:bg-neutral-700 text-white font-medium'
                               } active:bg-amber-500 active:text-neutral-950`}
                             >
-                              <div className="flex flex-col items-center justify-center min-h-[34px]">
-                                {swar.saptak === 'taar' && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mb-1" />
-                                )}
-
-                                <div className="relative inline-block leading-none">
-                                  <span className="text-xl font-bold">{swar.devanagari}</span>
-
-                                  {swar.isKomalOrTeevra && swar.baseName !== 'Ma' && (
-                                    <span className="absolute -bottom-1 left-0 right-0 h-[2px] bg-neutral-300 rounded" />
-                                  )}
-
-                                  {swar.baseName === 'Ma' && (
-                                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 w-[2px] h-2 bg-neutral-300" />
-                                  )}
-                                </div>
-
-                                {swar.saptak === 'mandra' && (
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-1.5" />
-                                )}
+                              <div className="min-h-[34px] flex items-center justify-center">
+                                <BhatkhandeSwar swar={swar} size="md" />
                               </div>
-
                               <span className="text-[10px] text-neutral-400 mt-1">{swar.latinNotation}</span>
                             </button>
                           ))}
