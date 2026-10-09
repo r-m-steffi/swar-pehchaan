@@ -55,12 +55,23 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
+  const siteNameJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Swar Pehchaan',
+    alternateName: ['Swar Pehchan', 'स्वर पहचान'],
+    url: 'https://swar-pehchaan.vercel.app',
+  };
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+      <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(siteNameJsonLd) }}
+        />
         {children}
         <Analytics />
       </body>
